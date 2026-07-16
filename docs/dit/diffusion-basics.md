@@ -265,6 +265,12 @@ loss.backward()
 
 ## 6. 采样：把噪声一步步搬回图像
 
+!!! note "留意：本篇到此都是「无条件」生成，还没有方向盘"
+
+    看下面采样公式里的网络——它始终是 \(\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t)\)，只吃"带噪图像"和"时间步"，**没有任何文本/条件输入**。因此从纯噪声出发得到的是 \(p(\mathbf{x})\) 的一个随机样本："一张合理的自然图像"，但画什么主体、什么构图完全不受控，给不了"画一只猫"这样的指令。
+
+    如何把网络变成 \(\boldsymbol{\epsilon}_\theta(\mathbf{x}_t, t, \mathbf{c})\)、从而按文本采样 \(p(\mathbf{x}\mid\mathbf{c})\)，是**条件机制**的主题，留到 `conditioning.md` 专门讲——核心是两件事：用 **cross-attention** 把文本逐词注入去噪网络，再用 **classifier-free guidance** 把条件的影响放大到够强。历史上也正是这个顺序：DDPM (2020) 做的是无条件生成，文本控制要到 2022 年的 Latent Diffusion / Stable Diffusion 才成熟。
+
 ### 6.1 DDPM 祖先采样
 
 训练完，从 \(\mathbf{x}_T\sim\mathcal{N}(\mathbf{0},\mathbf{I})\) 出发，逐步去噪：
@@ -321,11 +327,12 @@ DDIM 的洞察是：\(L_{\text{simple}}\) 只依赖边缘分布 \(q(\mathbf{x}_t
 
 | 瓶颈 | 谁来解决 |
 |---|---|
+| 从纯噪声只能生成**任意**图像，给不了"画什么"的指令 | `conditioning.md`：cross-attention 注入文本 + classifier-free guidance |
 | 采样仍需几十步，且在**像素空间**做，高分辨率算力爆炸 | `latent-diffusion.md`：搬进 VAE 潜空间 |
 | 加噪时间表、离散步数都是人为设定，路径弯弯绕绕 | `flow-matching.md`：直接学速度场，走直线 |
 | 去噪骨干 U-Net 是卷积时代产物，scaling 行为不明 | `dit-arch.md`：换成 Transformer |
 
-（上面三篇尚未动笔，写完后这里会改成站内链接。）
+（上面四篇尚未动笔，写完后这里会改成站内链接。）
 
 ## 参考文献
 

@@ -12,6 +12,7 @@
 - [ ] `latent-diffusion.md` —— Latent Diffusion：VAE 潜空间、为何不在像素空间做
 - [ ] `dit-arch.md` —— DiT 架构：patchify、adaLN-Zero 条件注入、scaling law（Peebles & Xie 2023）
 - [ ] `conditioning.md` —— 条件机制：cross-attention、classifier-free guidance、T5/CLIP 文本编码
+      > 直接承接基础篇：基础篇是无条件生成 \(p(\mathbf{x})\)，这一篇讲如何用文本控制成 \(p(\mathbf{x}\mid\mathbf{c})\)。
 - [ ] `video-dit.md` —— 视频生成：时空 patch、spatial/temporal attention、时序一致性（Sora 类）
 - [ ] `models-survey.md` —— 代表模型对照：SD3 / PixArt / Flux / Sora / Seedance 的取舍
 
