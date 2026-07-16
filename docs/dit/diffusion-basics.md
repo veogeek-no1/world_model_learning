@@ -273,6 +273,75 @@ Improved DDPM 因此改用 **cosine schedule**（蓝）：
 
     这正是"必须拆成很多小步"的深层原因：步子迈大了，反向分布会变成复杂的多峰分布（从一张糊图能还原出的清晰图有很多种），高斯就拟合不了了。**\(T\) 大 \(\Leftrightarrow\) 每步 \(\beta_t\) 小 \(\Leftrightarrow\) 反向可用高斯近似**——三者是一回事。
 
+??? note "展开：这个「关键事实」凭什么成立？三层论证，从机制到定理"
+
+    上面是个断言，不该被无条件吞下。它有三层论证，严格程度递增：Taylor 展开讲机制，一个可精确求解的例子给硬验证，连续时间定理给严格地基。
+
+    **▍论证一：Bayes + Taylor —— 看清"小步"到底在哪里进场**
+
+    对反向条件用贝叶斯，把它拆成两个因子：
+
+    \[
+    q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\ \propto\ \underbrace{q(\mathbf{x}_t\mid\mathbf{x}_{t-1})}_{\text{似然：高斯，已知}}\ \cdot\ \underbrace{q(\mathbf{x}_{t-1})}_{\text{边缘：复杂多峰}}
+    \]
+
+    **似然项**作为 \(\mathbf{x}_{t-1}\) 的函数：
+
+    \[
+    \log q(\mathbf{x}_t\mid\mathbf{x}_{t-1}) = -\frac{1-\beta_t}{2\beta_t}\left\|\mathbf{x}_{t-1}-\frac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\right\|^2 + C
+    \]
+
+    是一个中心在 \(\mathbf{x}_t\) 附近、**宽度 \(O(\sqrt{\beta_t})\) 的极窄高斯窗**——它把 \(\mathbf{x}_{t-1}\) 死死限制在 \(\mathbf{x}_t\) 周围的小球里。
+
+    **边缘项** \(\log q(\mathbf{x}_{t-1})\) 是复杂多峰的函数，但我们**只需要它在窗内的样子**。在窗内 Taylor 展开：
+
+    \[
+    \log q(\mathbf{x}_{t-1}) \approx \log q(\mathbf{x}_t) + (\mathbf{x}_{t-1}-\mathbf{x}_t)^\top\nabla\log q(\mathbf{x}_t) + \tfrac{1}{2}(\mathbf{x}_{t-1}-\mathbf{x}_t)^\top\mathbf{H}\,(\mathbf{x}_{t-1}-\mathbf{x}_t)
+    \]
+
+    逐项看它对高斯窗做了什么：
+
+    - **线性项**：高斯乘一个指数线性倾斜**仍是高斯**，只是均值平移 \(\beta_t\nabla\log q(\mathbf{x}_t)\)。注意——**score 自己冒出来了**，反向均值本质上就是"沿 score 场走一小步"，这正好呼应第 7 节。
+    - **二次项**：边缘分布的曲率 \(\mathbf{H}\) 是 \(O(1)\)（由数据分布的平滑度决定，不随 \(\beta_t\) 变），而似然窗的曲率是 \(1/\beta_t\)。相对修正 \(=O(\beta_t)\to 0\)，忽略。
+
+    于是（\(q_{t-1}\) 与 \(q_t\) 之差同为 \(O(\beta_t)\)，并入误差项）：
+
+    \[
+    q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\ \approx\ \mathcal{N}\!\left(\frac{\mathbf{x}_t}{\sqrt{1-\beta_t}}+\beta_t\nabla\log q(\mathbf{x}_t),\ \ \beta_t\mathbf{I}\right)
+    \]
+
+    **"小步"在哪进场，一目了然**：整个论证靠"在 \(O(\sqrt{\beta_t})\) 宽的窗内 \(\log q\) 可以线性化"。步子一大，窗变宽，窗内装进边缘分布的多个峰，线性化失效 → 后验真的变多峰。"一张糊图能还原出很多种清晰图"，说的就是窗太宽、窗里有好几个互不相干的原像。
+
+    **▍论证二：一个可精确求解的例子 —— 双点数据，亲手验证**
+
+    取最极端的数据分布：只有两个点，\(p_{\text{data}}=\tfrac12\delta_{-1}+\tfrac12\delta_{+1}\)。此时反向条件可以**精确算出**（就用本节下文的后验公式 \(\tilde\mu_t,\tilde\beta_t\)，对两个可能的 \(\mathbf{x}_0\) 加权）：
+
+    \[
+    q(x_{t-1}\mid x_t)=\sum_{k=\pm1} w_k(x_t)\,\mathcal{N}\!\big(\tilde\mu_t(x_t,k),\ \tilde\beta_t\big),\qquad w_k\propto\tfrac12\,\mathcal{N}\!\big(x_t;\ \sqrt{\bar\alpha_t}\,k,\ 1-\bar\alpha_t\big)
+    \]
+
+    它**天生是两个高斯的混合**——严格说就是多峰的！但看"分量间距 / 分量宽度"这个比值：\(\tilde\mu_t\) 里 \(x_0\) 的系数是 \(\sqrt{\bar\alpha_{t-1}}\beta_t/(1-\bar\alpha_t)\)，所以**间距 \(=O(\beta_t)\)**；而分量宽度 \(\sqrt{\tilde\beta_t}=O(\sqrt{\beta_t})\)。比值 \(=O(\sqrt{\beta_t})\to 0\)：**间距塌缩得比宽度快，两峰融成一个高斯**。这就是"近似高斯"的精确含义。实算一遍（固定噪声水平 \(\bar\alpha_t=0.5\)、固定观测 \(x_t\)，只改单步大小）：
+
+    ![双点数据下精确的反向条件分布：小步近似高斯，大步明显双峰](images/reverse-gaussian-light.svg#only-light)
+    ![双点数据下精确的反向条件分布：小步近似高斯，大步明显双峰](images/reverse-gaussian-dark.svg#only-dark)
+
+    - \(\beta_t=0.02\)：间距/宽度 \(=0.41\)，精确分布与单高斯拟合的 \(\mathrm{KL}=1.0\times10^{-6}\)——**肉眼与数值上都无法区分**。
+    - \(\beta_t=0.4\)：间距/宽度 \(=4.0\)，\(\mathrm{KL}=0.17\)——差了**约 17 万倍**，明显双峰，单高斯拟合失效。
+
+    反过来推到极限也成立：**一步到位**（\(\bar\alpha_{t-1}=1\)）时公式给出分量宽度 \(\to 0\)、均值正好落在 \(\pm1\)——后验变成**两根尖刺**，最极端的多峰。"步大 → 多峰"从直觉变成了精确结论。（图与数字由 [`scripts/gen_reverse_gaussian.py`](https://github.com/veogeek-no1/world_model_learning/blob/main/scripts/gen_reverse_gaussian.py) 实算生成。）
+
+    **▍论证三：连续时间的严格定理（Anderson 1982）**
+
+    把前向过程看成 SDE \(\mathrm{d}\mathbf{x}=f\,\mathrm{d}t+g\,\mathrm{d}\mathbf{w}\) 的离散化，则有经典的**时间反演定理**：扩散 SDE 的时间反演**仍是扩散 SDE**——
+
+    \[
+    \mathrm{d}\mathbf{x}=\big[f(\mathbf{x},t)-g^2(t)\,\nabla_\mathbf{x}\log q_t(\mathbf{x})\big]\mathrm{d}t+g(t)\,\mathrm{d}\bar{\mathbf{w}}
+    \]
+
+    而扩散 SDE 的无穷小转移**由构造就是高斯**（漂移 \(\cdot\,\mathrm{d}t\) + 高斯噪声 \(\cdot\sqrt{\mathrm{d}t}\)）。所以"小步下反向条件近似高斯"的严格版本就是：**反向过程本身也是一个扩散过程**。DDPM 的祖先采样正是这条反向 SDE 的 Euler–Maruyama 离散化——论证一推出的均值与定理的漂移逐项对得上。这条识别由 Score SDE (Song et al. 2021) 挑明；更早的出处链是 Sohl-Dickstein 2015 引 Feller (1949) 对离散情形的论证。诚实标注：Anderson 定理本身的证明需要平滑性/可积性等技术条件，超出本笔记范围。
+
+    三层其实是一件事的三个面：**Taylor 讲机制、双点例子给硬验证、Anderson 给严格地基**——且三者都把 score \(\nabla\log q\) 顶到台面上，与第 7 节严丝合缝。
+
 于是用神经网络参数化一个高斯：
 
 \[
