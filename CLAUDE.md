@@ -43,17 +43,28 @@
 
 ```
 world_model_research/
-├── CLAUDE.md          # 本文件
-├── vlm/               # 图像→文字：视觉理解
-│   └── README.md      # 该主线的主题清单与进度
-├── dit/               # 文字→图像/视频：生成与模拟
-│   └── README.md
-├── world-model/       # 北极星：理解+生成+动力学
-│   └── README.md
-└── papers/            # 各方向奠基论文原文/精读笔记
+├── CLAUDE.md              # 本文件（仅供 Claude；不发布到站点）
+├── mkdocs.yml             # 站点配置：主题、导航、数学、中文搜索
+├── requirements-docs.txt  # 构建依赖（版本已锁死，勿改成浮动版本）
+├── .github/workflows/     # CI：push 到 main 自动构建并部署 Pages
+└── docs/                  # ★ 所有笔记都写在这里，即站点内容源
+    ├── index.md           # 站点首页：研究版图与入口
+    ├── roadmap.md         # 全局演进脉络：DDPM → ... → 世界模型
+    ├── vlm/README.md      # 图像→文字：视觉理解，主题清单与进度
+    ├── dit/README.md      # 文字→图像/视频：生成与模拟
+    ├── world-model/README.md  # 北极星：理解+生成+动力学
+    └── papers/            # 各方向奠基论文原文/精读笔记
 ```
+
+**新增笔记时**：文件放进 `docs/` 对应主线目录下，并在 `mkdocs.yml` 的 `nav:` 里登记，否则不会出现在站点导航中（`--strict` 模式下未登记的文件会让 CI 构建失败）。各主线的 `README.md` 会被 MkDocs 当作该章节的首页，同时在 GitHub 上浏览目录时也正常显示。
 
 ## 环境说明
 
-- 当前目录尚未初始化为 git 仓库；开始记笔记后可 `git init` 做版本管理。
 - 本目录默认以**论文精读 + 算法/架构分析**为主，暂不假设有训练/推理的 GPU 环境。
+- 远端仓库：`https://github.com/veogeek-no1/world_model_learning`（公开）。
+  该仓库单独配置了 `user.email = veogeek@gmail.com`，勿改回全局的公司邮箱。
+- 站点：<https://veogeek-no1.github.io/world_model_learning/>，push 到 `main` 后由 CI 自动部署。
+- **公式请用 LaTeX 语法书写**（`\(...\)` 行内、`\[...\]` 独立成行），站点已接 MathJax 渲染；
+  不要像早期 `roadmap.md` 那样用 inline code 拼公式，那样不会被渲染。
+- 本地预览：`pip install -r requirements-docs.txt && mkdocs serve`。
+  若在公司网络外，pip 需加 `--index-url https://pypi.org/simple/` 绕开内网镜像。

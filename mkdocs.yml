@@ -1,0 +1,75 @@
+site_name: 世界模型研究笔记
+site_description: 从 VLM 的理解到 DiT 的生成，通往世界模型
+site_url: https://veogeek-no1.github.io/world_model_learning/
+repo_url: https://github.com/veogeek-no1/world_model_learning
+repo_name: veogeek-no1/world_model_learning
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: zh
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: 切换到深色模式
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: 切换到浅色模式
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.action.edit
+    - toc.follow
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - footnotes
+  - toc:
+      permalink: true
+      permalink_title: 本节链接
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.details
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  # lang: zh 会启用 jieba 中文分词，否则中文搜索按整段匹配、基本不可用
+  - search:
+      lang:
+        - zh
+        - en
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+nav:
+  - 首页: index.md
+  - 演进脉络: roadmap.md
+  - VLM · 视觉理解: vlm/README.md
+  - DiT · 生成与模拟: dit/README.md
+  - 世界模型 · 北极星: world-model/README.md

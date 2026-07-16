@@ -1,0 +1,12 @@
+# MkDocs 构建产物，由 CI 生成，不入库
+site/
+.cache/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# macOS
+.DS_Store

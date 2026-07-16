@@ -1,0 +1,7 @@
+# 文档站点构建依赖。版本锁死是刻意的：
+# mkdocs-material 已预告 MkDocs 2.0 将移除插件系统且无迁移路径，
+# 浮动版本会在上游发版当天把 CI 构建打挂。升级请手动改这里并本地
+# 跑一次 `mkdocs build --strict` 验证。
+mkdocs-material==9.7.6
+mkdocs>=1.6,<2.0
+jieba==0.42.1
