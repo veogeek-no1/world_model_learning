@@ -47,6 +47,7 @@ world_model_research/
 ├── mkdocs.yml             # 站点配置：主题、导航、数学、中文搜索
 ├── requirements-docs.txt  # 构建依赖（版本已锁死，勿改成浮动版本）
 ├── .github/workflows/     # CI：push 到 main 自动构建并部署 Pages
+├── scripts/               # 生成配图的脚本（不发布）；产物提交到 docs/*/images/
 └── docs/                  # ★ 所有笔记都写在这里，即站点内容源
     ├── index.md           # 站点首页：研究版图与入口
     ├── roadmap.md         # 全局演进脉络：DDPM → ... → 世界模型
@@ -66,5 +67,10 @@ world_model_research/
 - 站点：<https://veogeek-no1.github.io/world_model_learning/>，push 到 `main` 后由 CI 自动部署。
 - **公式请用 LaTeX 语法书写**（`\(...\)` 行内、`\[...\]` 独立成行），站点已接 MathJax 渲染；
   不要像早期 `roadmap.md` 那样用 inline code 拼公式，那样不会被渲染。
+  **标题里不要放公式**——侧边目录不参与 MathJax 渲染，会露出 LaTeX 源码。
+- **配图**：概念示意图用 ```mermaid 代码块（自动跟随深色模式、可 diff）；
+  函数曲线等须准确的图用 `scripts/` 下的脚本生成 SVG，明暗各一版，正文用
+  `![](x-light.svg#only-light)` / `![](x-dark.svg#only-dark)` 引用。
+  **不要把论文原图搬到站点上**（公开站点，有版权风险），引用图号 + 链接即可。
 - 本地预览：`pip install -r requirements-docs.txt && mkdocs serve`。
   若在公司网络外，pip 需加 `--index-url https://pypi.org/simple/` 绕开内网镜像。

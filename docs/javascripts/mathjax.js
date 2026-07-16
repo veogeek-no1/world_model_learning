@@ -1,5 +1,11 @@
 window.MathJax = {
+  // tex-mml-chtml 是精简包，不含 boldsymbol；不显式加载的话
+  // \boldsymbol{\epsilon} 会渲染成刺眼的红色报错字面量。
+  loader: {
+    load: ["[tex]/boldsymbol"],
+  },
   tex: {
+    packages: { "[+]": ["boldsymbol"] },
     inlineMath: [["\\(", "\\)"]],
     displayMath: [["\\[", "\\]"]],
     processEscapes: true,

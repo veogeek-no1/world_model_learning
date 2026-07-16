@@ -4,7 +4,10 @@
 
 ## 主题清单
 
-- [ ] `diffusion-basics.md` —— 扩散模型基础：前向加噪、反向去噪、DDPM/DDIM 采样、score/ε 预测
+- [x] [`diffusion-basics.md`](diffusion-basics.md) —— 扩散模型基础：前向加噪、反向去噪、DDPM/DDIM 采样、score/ε 预测
+      > 一句话结论：闭式解 \(\mathbf{x}_t=\sqrt{\bar\alpha_t}\mathbf{x}_0+\sqrt{1-\bar\alpha_t}\boldsymbol{\epsilon}\) 是全篇支点——
+      > 它让训练能随机取 \(t\) 一步构造样本；而 ELBO 一路化简后只剩一行 MSE，
+      > 预测噪声而非原图使任务难度在 \(t\) 上均衡。多步的根本原因是：\(\beta_t\) 小，反向分布才近似高斯。
 - [ ] `flow-matching.md` —— Flow matching / rectified flow：与 diffusion 的关系、为何 SD3/Flux 采用
 - [ ] `latent-diffusion.md` —— Latent Diffusion：VAE 潜空间、为何不在像素空间做
 - [ ] `dit-arch.md` —— DiT 架构：patchify、adaLN-Zero 条件注入、scaling law（Peebles & Xie 2023）
