@@ -397,6 +397,95 @@ L = \underbrace{D_{\mathrm{KL}}\!\left(q(\mathbf{x}_T|\mathbf{x}_0)\,\|\,p(\math
 \underbrace{-\log p_\theta(\mathbf{x}_0|\mathbf{x}_1)}_{L_0:\ \text{重建项}}
 \]
 
+??? note "展开：这两行是怎么来的？——从积分困境到逐项 KL，全程只有一个不等号"
+
+    **▍第零步：困难是什么**
+
+    模型定义的是整条反向链的联合分布 \(p_\theta(\mathbf{x}_{0:T})=p(\mathbf{x}_T)\prod_{t=1}^T p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)\)。要拿到单独的 \(p_\theta(\mathbf{x}_0)\)，得把整条轨迹积分掉：
+
+    \[
+    p_\theta(\mathbf{x}_0)=\int p_\theta(\mathbf{x}_{0:T})\,\mathrm{d}\mathbf{x}_{1:T}
+    \]
+
+    这是 \(T\times\)图像维度重的积分（1000 步 × 几十万维），绝无可能算出。这正是第 1 节"最后一块拼图"的分类在现场发生：**密度算不动 → 退而求下界**——下面就来造这个下界。
+
+    **▍第一步：乘除同一个 \(q\)——把积分变成期望**
+
+    在积分里同乘同除前向过程 \(q(\mathbf{x}_{1:T}|\mathbf{x}_0)\)（我们自己定义的，已知、可采样）：
+
+    \[
+    \log p_\theta(\mathbf{x}_0)=\log\!\int q(\mathbf{x}_{1:T}|\mathbf{x}_0)\,\frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)}\,\mathrm{d}\mathbf{x}_{1:T}
+    =\log\,\mathbb{E}_{q(\mathbf{x}_{1:T}|\mathbf{x}_0)}\!\left[\frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right]
+    \]
+
+    这一步是**恒等变形**，意义在于：把"没法算的积分"改写成"某个分布下的期望"——期望可以**采样估计**，而 \(q\) 是前向加噪，采样零成本。
+
+    **▍第二步：Jensen 不等式（全程唯一的不等号）**
+
+    现在卡在 log 套在期望**外面**。Jensen 不等式：对凹函数（log 的曲线向下弯）有 \(\log\mathbb{E}[Y]\ge\mathbb{E}[\log Y]\)。数字感受：\(Y\) 以各半概率取 1 或 100，左边 \(\log 50.5\approx 3.92\)，右边 \((\log 1+\log 100)/2\approx 2.30\)——"平均后取 log" ≥ "取 log 后平均"，因为 log 压缩大值。应用之：
+
+    \[
+    \log p_\theta(\mathbf{x}_0)\ \ge\ \mathbb{E}_q\!\left[\log\frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}|\mathbf{x}_0)}\right]=:\mathrm{ELBO}
+    \]
+
+    两边取负（不等号翻转），就得到正文那行变分上界 \(L\)。两句补充：**"变分"**指这个界对任意辅助分布 \(q\) 都成立、原则上可在分布空间里变动 \(q\) 调松紧——VAE 真的去学 \(q\)（encoder），而 diffusion **把 \(q\) 固定为前向加噪，不学**，省了一整个网络；且这个界不是拍脑袋的——可以证明**松紧差恰为 \(D_{\mathrm{KL}}(q(\mathbf{x}_{1:T}|\mathbf{x}_0)\,\|\,p_\theta(\mathbf{x}_{1:T}|\mathbf{x}_0))\)**，\(q\) 越接近模型真实后验，界越紧。
+
+    **▍第三步：代入两条马尔可夫链的因子分解**
+
+    \[
+    q(\mathbf{x}_{1:T}|\mathbf{x}_0)=\prod_{t=1}^{T}q(\mathbf{x}_t|\mathbf{x}_{t-1}),\qquad
+    p_\theta(\mathbf{x}_{0:T})=p(\mathbf{x}_T)\prod_{t=1}^{T}p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)
+    \]
+
+    \[
+    L=\mathbb{E}_q\!\left[-\log p(\mathbf{x}_T)-\sum_{t=1}^{T}\log p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)+\sum_{t=1}^{T}\log q(\mathbf{x}_t|\mathbf{x}_{t-1})\right]
+    \]
+
+    **▍第四步：发现方向不匹配——借 \(\mathbf{x}_0\) 翻转 \(q\)**
+
+    想逐项配成 KL，需要**同方向的一对分布**，但 \(p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)\) 往回走、\(q(\mathbf{x}_t|\mathbf{x}_{t-1})\) 往前走，配不上。直接翻转成 \(q(\mathbf{x}_{t-1}|\mathbf{x}_t)\) 不行——第 4 节说过它 intractable；但第 4 节同时给了钥匙：**多条件一个 \(\mathbf{x}_0\)，反向后验就有闭式解**。于是（对 \(t\ge2\)）：
+
+    \[
+    q(\mathbf{x}_t|\mathbf{x}_{t-1})\overset{\text{马尔可夫}}{=}q(\mathbf{x}_t|\mathbf{x}_{t-1},\mathbf{x}_0)
+    \overset{\text{贝叶斯}}{=}\frac{q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)\;q(\mathbf{x}_t|\mathbf{x}_0)}{q(\mathbf{x}_{t-1}|\mathbf{x}_0)}
+    \]
+
+    第一个等号值得停一下：前向加噪只看上一步，已知 \(\mathbf{x}_{t-1}\) 后再告诉它 \(\mathbf{x}_0\) 不改变分布——这让我们能"免费"塞进 \(\mathbf{x}_0\) 这个条件；第二个等号就是熟悉的贝叶斯，只是每项都带着 \(\mid\mathbf{x}_0\)。
+
+    **▍第五步：望远镜相消（最漂亮的一步）**
+
+    对 \(t=2\ldots T\) 应用上式（\(t=1\) 的 \(\log q(\mathbf{x}_1|\mathbf{x}_0)\) 单独留着），前向链的和变成三部分，其中比值项**写开看**：
+
+    \[
+    \sum_{t=2}^{T}\log\frac{q(\mathbf{x}_t|\mathbf{x}_0)}{q(\mathbf{x}_{t-1}|\mathbf{x}_0)}
+    =\big[\log q(\mathbf{x}_2|\mathbf{x}_0)-\log q(\mathbf{x}_1|\mathbf{x}_0)\big]+\cdots+\big[\log q(\mathbf{x}_T|\mathbf{x}_0)-\log q(\mathbf{x}_{T-1}|\mathbf{x}_0)\big]
+    =\log\frac{q(\mathbf{x}_T|\mathbf{x}_0)}{q(\mathbf{x}_1|\mathbf{x}_0)}
+    \]
+
+    相邻项成对抵消，只剩头尾；剩下的 \(-\log q(\mathbf{x}_1|\mathbf{x}_0)\) 又和单独留出的那项相消。于是：
+
+    \[
+    \sum_{t=1}^{T}\log q(\mathbf{x}_t|\mathbf{x}_{t-1})=\sum_{t=2}^{T}\log q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)+\log q(\mathbf{x}_T|\mathbf{x}_0)
+    \]
+
+    整条前向链被改写成了"**一串带 \(\mathbf{x}_0\) 的反向后验 + 一个端点项**"——方向统一了。
+
+    **▍第六步：重组，逐项认领身份**
+
+    塞回 \(L\)，按"谁跟谁比"分组：
+
+    \[
+    L=\mathbb{E}_q\!\left[\underbrace{\log\frac{q(\mathbf{x}_T|\mathbf{x}_0)}{p(\mathbf{x}_T)}}_{\text{端点对端点}}
+    +\sum_{t=2}^{T}\underbrace{\log\frac{q(\mathbf{x}_{t-1}|\mathbf{x}_t,\mathbf{x}_0)}{p_\theta(\mathbf{x}_{t-1}|\mathbf{x}_t)}}_{\text{同为反向，可比了}}
+    \underbrace{-\log p_\theta(\mathbf{x}_0|\mathbf{x}_1)}_{\text{最后一步}}\right]
+    \]
+
+    每组 \(\mathbb{E}[\log(q/p)]\) 先对内层变量取期望、按定义就是 KL，再对外层条件取期望——这就是正文那行逐项分解。**第 4 节费劲求的带 \(\mathbf{x}_0\) 后验，回报在这里兑现：它就是每一步的监督信号（教师），网络的高斯是学生。**（\(L_0\) 实践中并入同一个 ε-MSE，相当于 \(L_{\text{simple}}\) 里 \(t=1\) 的那项。）
+
+    **▍回头看全程**
+
+    积分算不动 → 乘除 \(q\) 变期望（恒等）→ Jensen（**唯一的不等号**，松紧差 = \(q\) 与真后验的 KL）→ 两链因子分解（恒等）→ 借 \(\mathbf{x}_0\) 翻方向（恒等）→ 望远镜相消（恒等）→ 重组成 \(L_T+\sum L_{t-1}+L_0\)（恒等）。全程只有一步放走了精度，其余都是恒等变形——这个上界并不"松得可疑"。
+
 \(L_T\) 不含 \(\theta\)，直接扔掉。主项 \(L_{t-1}\) 是**两个高斯之间的 KL**，有闭式解——在方差固定为 \(\sigma_t^2\) 时，它退化成两个均值的平方距离：
 
 \[
