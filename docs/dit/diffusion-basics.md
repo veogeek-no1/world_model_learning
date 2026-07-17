@@ -263,7 +263,7 @@ Improved DDPM 因此改用 **cosine schedule**（蓝）：
     图由 [`scripts/gen_noise_schedule.py`](https://github.com/veogeek-no1/world_model_learning/blob/main/scripts/gen_noise_schedule.py) 生成，
     上面这些数字全部来自实际计算而非估计。改 schedule 参数后重跑 `python scripts/gen_noise_schedule.py` 即可更新。
 
-## 4. 反向过程：为什么它也是高斯
+## 4. 反向过程：为什么反向条件可以近似建模成高斯
 
 我们想要 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\)——但它需要对整个数据分布积分，无法求得。这里有个漂亮的理论结果救场：
 
@@ -378,6 +378,28 @@ q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0) = \mathcal{N}\!\left(\mathbf{x}
 \]
 
 训练时 \(\mathbf{x}_0\) 是已知的（就是那张真图），所以这个后验可以当作**监督目标**。这就是整个训练目标的支点。
+
+!!! warning "厘清：本节其实用了**两个不同**的高斯事实，别混"
+
+    本节先说"反向条件近似是高斯"（关键事实），转头又说"带 \(\mathbf{x}_0\) 就有解析高斯"——这是**两个不同的分布、精确程度不同、用途也不同**。一张公式把它们串起来：无 \(\mathbf{x}_0\) 的真反向，其实是带 \(\mathbf{x}_0\) 后验的**混合**——
+
+    \[
+    \underbrace{q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)}_{\text{无 }\mathbf{x}_0\text{，真反向}}=\int \underbrace{q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)}_{\text{每个都是精确高斯}}\,\underbrace{q(\mathbf{x}_0\mid\mathbf{x}_t)}_{\text{"}\mathbf{x}_t\text{ 可能来自哪个 }\mathbf{x}_0\text{"}}\,\mathrm{d}\mathbf{x}_0
+    \]
+
+    于是三种分布的身份一目了然：
+
+    - **带 \(\mathbf{x}_0\)**（教师）\(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\)：从混合里**挑出单独一个分量** → **精确高斯，任意 \(\beta_t\) 都成立**（上面刚推的闭式解）。
+    - **不带 \(\mathbf{x}_0\)**（真反向）\(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\)：**整个混合**摆在那 → 一堆高斯叠加，**精确地看不是高斯**（一般多峰）；但 \(\beta_t\) 小时各分量的均值挤在 \(O(\beta_t)\) 内（论证二算过），混合塌成一个 → **近似高斯**。这才是"关键事实"的准确含义：**不是"就是高斯"，而是"小步下近似高斯"**。
+
+    两个事实各管一头，别张冠李戴：
+
+    | 事实 | 说的是哪个分布 | 用在哪个阶段 |
+    |---|---|---|
+    | 关键事实（无 \(\mathbf{x}_0\) **近似**高斯） | 真反向 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) | **采样**：没有 \(\mathbf{x}_0\)，拿 \(p_\theta\) 近似真反向——真反向近似高斯，高斯 \(p_\theta\) 才**够格**建模它 |
+    | 闭式后验（带 \(\mathbf{x}_0\) **精确**高斯） | 后验 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) | **训练**：有 \(\mathbf{x}_0\)，拿它当**可算的**监督目标（教师） |
+
+    所以标题问的"反向条件可以近似建模成高斯"，主语是**无 \(\mathbf{x}_0\) 的真反向**，答案是"小 \(\beta_t\) 下近似成立"；而训练里那个精确高斯的教师，是**另一个**分布（带 \(\mathbf{x}_0\)）。
 
 ## 5. 训练目标：从 ELBO 到一行 MSE
 
@@ -503,12 +525,12 @@ L_{t-1} = \mathbb{E}_q\left[\frac{1}{2\sigma_t^2}\left\|\tilde{\boldsymbol{\mu}}
 
     容易记岔的是**第三种**分布——真反向 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\)（**不带** \(\mathbf{x}_0\)）：它**才是**多峰、intractable 的那个（第 4 节一直在对付它）。正因为它写不出解析式、当不了教师，整个推导才要绕一圈"借 \(\mathbf{x}_0\) 翻转方向"（见 5.1 折叠块第四步），把教师换成带 \(\mathbf{x}_0\) 的高斯后验。一张小抄：
 
-    | 分布 | 高斯？ | 为什么 |
-    |---|---|---|
-    | \(q(\mathbf{x}_t\mid\mathbf{x}_{t-1})\) 正向 | ✅ | 自己定义的加噪 |
-    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 真反向（无 \(\mathbf{x}_0\)） | ❌ | 多峰、intractable |
-    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) 反向后验（带 \(\mathbf{x}_0\)） | ✅ | 第 4 节闭式解（**教师**） |
-    | \(p_\theta(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 网络反向 | ✅ | 人为设计成高斯（**学生**） |
+    | 分布 | 精确高斯？ | 小 \(\beta\) 近似高斯？ | 为什么 |
+    |---|---|---|---|
+    | \(q(\mathbf{x}_t\mid\mathbf{x}_{t-1})\) 正向 | ✅ | — | 自己定义的加噪 |
+    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 真反向（无 \(\mathbf{x}_0\)） | ❌ | ✅ | 是带 \(\mathbf{x}_0\) 后验的**混合**；精确多峰、intractable，小 \(\beta\) 才塌成高斯（第 4 节关键事实） |
+    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) 反向后验（带 \(\mathbf{x}_0\)） | ✅ | — | 混合里的单个分量，第 4 节闭式解（**教师**） |
+    | \(p_\theta(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 网络反向 | ✅ | — | 人为设计成高斯（**学生**） |
 
 到这里，"学一个分布"已经变成了"回归一个均值"。
 
