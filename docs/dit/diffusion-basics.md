@@ -301,16 +301,25 @@ Improved DDPM 因此改用 **cosine schedule**（蓝）：
 
     是一个中心在 \(\mathbf{x}_t\) 附近、**宽度 \(O(\sqrt{\beta_t})\) 的极窄高斯窗**——它把 \(\mathbf{x}_{t-1}\) 死死限制在 \(\mathbf{x}_t\) 周围的小球里。
 
-    **边缘项** \(\log q(\mathbf{x}_{t-1})\) 是复杂多峰的函数，但我们**只需要它在窗内的样子**。在窗内 Taylor 展开：
+    **边缘项** \(\log q(\mathbf{x}_{t-1})\) 是复杂多峰的函数，但我们**只需要它在窗内的样子**。先钉死展开的对象：Taylor **只伺候这一项**——似然项本来就是高斯，取完 log 是**精确的**二次式，不需要任何近似。展开点取 \(\mathbf{x}_t\)，展开变量 \(\boldsymbol{\delta}=\mathbf{x}_{t-1}-\mathbf{x}_t\)；注意"\(\boldsymbol{\delta}\) 小"**不是假设，是似然窗强制的**——窗外 \(\|\boldsymbol{\delta}\|\gg\sqrt{\beta_t}\) 的候选早被压到零权重，展开只需在 \(\|\boldsymbol{\delta}\|\sim\sqrt{\beta_t}\) 内有效。记 \(\mathbf{s}=\nabla\log q(\mathbf{x}_t)\)（score）、\(\mathbf{H}\) 为 Hessian：
 
     \[
-    \log q(\mathbf{x}_{t-1}) \approx \log q(\mathbf{x}_t) + (\mathbf{x}_{t-1}-\mathbf{x}_t)^\top\nabla\log q(\mathbf{x}_t) + \tfrac{1}{2}(\mathbf{x}_{t-1}-\mathbf{x}_t)^\top\mathbf{H}\,(\mathbf{x}_{t-1}-\mathbf{x}_t)
+    \log q(\mathbf{x}_{t-1}) = \log q(\mathbf{x}_t) + \mathbf{s}^\top\boldsymbol{\delta} + \tfrac{1}{2}\boldsymbol{\delta}^\top\mathbf{H}\,\boldsymbol{\delta} + O(\|\boldsymbol{\delta}\|^3)
     \]
 
-    逐项看它对高斯窗做了什么：
+    把 \(\|\boldsymbol{\delta}\|\sim\sqrt{\beta_t}\) 代入逐阶记账，**每降一阶小一个 \(\sqrt{\beta_t}\)**：
 
-    - **线性项**：高斯乘一个指数线性倾斜**仍是高斯**，只是均值平移 \(\beta_t\nabla\log q(\mathbf{x}_t)\)。注意——**score 自己冒出来了**，反向均值本质上就是"沿 score 场走一小步"，这正好呼应第 7 节。
-    - **二次项**：边缘分布的曲率 \(\mathbf{H}\) 是 \(O(1)\)（由数据分布的平滑度决定，不随 \(\beta_t\) 变），而似然窗的曲率是 \(1/\beta_t\)。相对修正 \(=O(\beta_t)\to 0\)，忽略。
+    | 阶数 | 量级 | 对高斯窗做了什么 |
+    |---|---|---|
+    | 0 阶（常数） | \(O(1)\) | 被归一化吸收，无影响 |
+    | 1 阶 \(\mathbf{s}^\top\boldsymbol{\delta}\) | \(O(\sqrt{\beta_t})\) | **平移均值** \(\beta_t\mathbf{s}\)——高斯乘指数线性倾斜**仍是高斯**。score 自己冒出来了，呼应第 7 节 |
+    | 2 阶 \(\tfrac12\boldsymbol{\delta}^\top\mathbf{H}\boldsymbol{\delta}\) | \(O(\beta_t)\) | **微调方差**（相对改 \(O(\beta_t)\)），指数里加二次项**仍是高斯**——\(\mathbf{H}=O(1)\)，似然窗曲率 \(1/\beta_t\) 占绝对主导 |
+    | 3 阶起 | \(O(\beta_t^{3/2})\) | **真正破坏高斯性的第一项** |
+
+    两个自然的追问，答案都在这张表里：
+
+    - **为什么写到二阶、不在一阶就停？** 截断的合法性靠"写出第一个被扔掉的项，并证明它小"——只写到一阶就停，"凭什么可以线性化"就成了新的无凭据断言。这是摄动论证的规矩：**保到 n 阶，就要验尸 n+1 阶**。而且表里还藏着一个更强的事实：二阶即使不扔，结果**仍是高斯**（只是方差微调）；真正的非高斯性从三阶才开始——所以"近似高斯"这个结论，比"线性化"听起来的更稳固。
+    - **一阶和二阶都趋于零，凭什么保一扔二？** 看**累积**：采样要走 \(T\approx 1/\beta_t\) 步。一阶是**信号**——每步沿 score 平移 \(\beta_t\mathbf{s}\)，方向相干，累积 \(T\cdot\beta_t=O(1)\)，正是把纯噪声搬回数据分布的全部总位移，扔了它采样哪儿也去不了。二阶以上是**误差**——方差误差累积 \(T\cdot\beta_t^{2}=O(\beta_t)\to0\)，非高斯量累积 \(T\cdot\beta_t^{3/2}=O(\sqrt{\beta_t})\to0\)，把全部步数加完仍然消失。**保一扔二不是双标，是累积之后谁活谁死。**（这套记账与中心极限定理同一精神：许多小步叠加，高斯部分留下，非高斯修正被 \(\sqrt{\beta_t}\) 压掉。）
 
     于是（\(q_{t-1}\) 与 \(q_t\) 之差同为 \(O(\beta_t)\)，并入误差项）：
 
