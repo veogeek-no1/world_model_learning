@@ -279,7 +279,15 @@ Improved DDPM 因此改用 **cosine schedule**（蓝）：
 
     **▍论证一：Bayes + Taylor —— 看清"小步"到底在哪里进场**
 
-    对反向条件用贝叶斯，把它拆成两个因子：
+    对反向条件用贝叶斯定理，先把公式写全：
+
+    \[
+    q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\ =\ \frac{q(\mathbf{x}_t\mid\mathbf{x}_{t-1})\ \cdot\ q(\mathbf{x}_{t-1})}{q(\mathbf{x}_t)}
+    \]
+
+    三个因子各是谁：分子第一项是**似然**——"上一步若是这张图，加一步噪声后变成现在这样的概率"，这是前向方向，我们自己定义的，明确是高斯；分子第二项是**边缘** \(q(\mathbf{x}_{t-1})\)——\(t-1\) 噪声水平上这张图本身的常见程度，复杂多峰，扮演先验的角色；分母 \(q(\mathbf{x}_t)\) 是**归一化项**。
+
+    关键一步：**\(\mathbf{x}_t\) 是已经观测到、固定住的**，所以分母 \(q(\mathbf{x}_t)\) 不随 \(\mathbf{x}_{t-1}\) 变，只是一个常数。我们关心的是后验作为 \(\mathbf{x}_{t-1}\) 的函数长什么**形状**，常数不影响形状（最后归一化补回即可），因此把它省掉，写成正比：
 
     \[
     q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\ \propto\ \underbrace{q(\mathbf{x}_t\mid\mathbf{x}_{t-1})}_{\text{似然：高斯，已知}}\ \cdot\ \underbrace{q(\mathbf{x}_{t-1})}_{\text{边缘：复杂多峰}}
