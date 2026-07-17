@@ -492,6 +492,24 @@ L = \underbrace{D_{\mathrm{KL}}\!\left(q(\mathbf{x}_T|\mathbf{x}_0)\,\|\,p(\math
 L_{t-1} = \mathbb{E}_q\left[\frac{1}{2\sigma_t^2}\left\|\tilde{\boldsymbol{\mu}}_t(\mathbf{x}_t,\mathbf{x}_0) - \boldsymbol{\mu}_\theta(\mathbf{x}_t,t)\right\|^2\right] + C
 \]
 
+!!! warning "别记岔：\(L_{t-1}\) 里的两个分布**都是**高斯，但来路不同"
+
+    "反向不是高斯"只对了一半——**带不带 \(\mathbf{x}_0\)，反向分布是不是高斯，是两码事**。主项比较的两个分布：
+
+    - \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\)（**教师**）：是高斯，因为第 4 节那个带 \(\mathbf{x}_0\) 的闭式后验 \(\mathcal{N}(\tilde{\boldsymbol{\mu}}_t,\tilde\beta_t)\)。它**偷看了答案 \(\mathbf{x}_0\)**（训练时真图已知），所以知道该往哪退——是理想的、正确的一步去噪目标。
+    - \(p_\theta(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\)（**学生**）：是高斯，因为**我们主动把它设计成高斯**（下文参数化那步 \(\mathcal{N}(\boldsymbol{\mu}_\theta,\sigma_t^2\mathbf{I})\)，人为规定，不是推出来的）。它**看不到 \(\mathbf{x}_0\)**，只能靠网络去猜。
+
+    所以主项在做的事很直白：**让"看不到答案的学生"逼近"偷看了答案的教师"**；两者都是高斯，KL 才有闭式解、才退化成上面的均值平方距离。
+
+    容易记岔的是**第三种**分布——真反向 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\)（**不带** \(\mathbf{x}_0\)）：它**才是**多峰、intractable 的那个（第 4 节一直在对付它）。正因为它写不出解析式、当不了教师，整个推导才要绕一圈"借 \(\mathbf{x}_0\) 翻转方向"（见 5.1 折叠块第四步），把教师换成带 \(\mathbf{x}_0\) 的高斯后验。一张小抄：
+
+    | 分布 | 高斯？ | 为什么 |
+    |---|---|---|
+    | \(q(\mathbf{x}_t\mid\mathbf{x}_{t-1})\) 正向 | ✅ | 自己定义的加噪 |
+    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 真反向（无 \(\mathbf{x}_0\)） | ❌ | 多峰、intractable |
+    | \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) 反向后验（带 \(\mathbf{x}_0\)） | ✅ | 第 4 节闭式解（**教师**） |
+    | \(p_\theta(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 网络反向 | ✅ | 人为设计成高斯（**学生**） |
+
 到这里，"学一个分布"已经变成了"回归一个均值"。
 
 ### 5.2 换元：为什么预测噪声
