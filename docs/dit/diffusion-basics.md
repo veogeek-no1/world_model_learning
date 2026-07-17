@@ -293,13 +293,27 @@ Improved DDPM 因此改用 **cosine schedule**（蓝）：
     q(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\ \propto\ \underbrace{q(\mathbf{x}_t\mid\mathbf{x}_{t-1})}_{\text{似然：高斯，已知}}\ \cdot\ \underbrace{q(\mathbf{x}_{t-1})}_{\text{边缘：复杂多峰}}
     \]
 
-    **似然项**作为 \(\mathbf{x}_{t-1}\) 的函数：
+    **似然项**：先把它写全再取 log。前向条件（3.1 节）\(q(\mathbf{x}_t\mid\mathbf{x}_{t-1})=\mathcal{N}(\mathbf{x}_t;\sqrt{1-\beta_t}\,\mathbf{x}_{t-1},\beta_t\mathbf{I})\)，代进 \(d\) 维高斯密度 \(\mathcal{N}(\mathbf{x};\boldsymbol{\mu},\sigma^2\mathbf{I})=(2\pi\sigma^2)^{-d/2}\exp(-\|\mathbf{x}-\boldsymbol{\mu}\|^2/2\sigma^2)\)，取 log：
+
+    \[
+    \log q(\mathbf{x}_t\mid\mathbf{x}_{t-1}) = -\frac{1}{2\beta_t}\left\|\mathbf{x}_t-\sqrt{1-\beta_t}\,\mathbf{x}_{t-1}\right\|^2 \underbrace{-\ \tfrac{d}{2}\log(2\pi\beta_t)}_{\text{不含 }\mathbf{x}_{t-1}\text{，记为 }C}
+    \]
+
+    这是**精确的二次式**（无近似）。但我们要把它当 \(\mathbf{x}_{t-1}\) 的函数，得把范数整理成 \(\|\mathbf{x}_{t-1}-\text{中心}\|^2\) 的形状——从平方里提出 \(\sqrt{1-\beta_t}\)：
+
+    \[
+    \left\|\mathbf{x}_t-\sqrt{1-\beta_t}\,\mathbf{x}_{t-1}\right\|^2
+    =\left\|-\sqrt{1-\beta_t}\left(\mathbf{x}_{t-1}-\tfrac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\right)\right\|^2
+    =(1-\beta_t)\left\|\mathbf{x}_{t-1}-\tfrac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\right\|^2
+    \]
+
+    代回即得（\(1-\beta_t\) 除到 \(2\beta_t\) 上，给出那个系数）：
 
     \[
     \log q(\mathbf{x}_t\mid\mathbf{x}_{t-1}) = -\frac{1-\beta_t}{2\beta_t}\left\|\mathbf{x}_{t-1}-\frac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\right\|^2 + C
     \]
 
-    是一个中心在 \(\mathbf{x}_t\) 附近、**宽度 \(O(\sqrt{\beta_t})\) 的极窄高斯窗**——它把 \(\mathbf{x}_{t-1}\) 死死限制在 \(\mathbf{x}_t\) 周围的小球里。
+    每个部件都有出处：系数 \(\tfrac{1-\beta_t}{2\beta_t}\) 来自"提出 \(1-\beta_t\) 再除 \(2\beta_t\)"，中心 \(\tfrac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\) 来自把 \(\sqrt{1-\beta_t}\) 除到 \(\mathbf{x}_t\) 上。把它当 \(\mathbf{x}_{t-1}\) 的高斯读，方差 \(\sigma'^2\) 满足 \(\tfrac{1}{2\sigma'^2}=\tfrac{1-\beta_t}{2\beta_t}\)，即 \(\sigma'^2=\tfrac{\beta_t}{1-\beta_t}\approx\beta_t\)——所以它是一个中心在 \(\tfrac{\mathbf{x}_t}{\sqrt{1-\beta_t}}\)（\(\approx\mathbf{x}_t\)）、**宽度 \(O(\sqrt{\beta_t})\) 的极窄高斯窗**（"宽度 \(\sqrt{\beta_t}\)"就是这么反推出来的），把 \(\mathbf{x}_{t-1}\) 死死限制在 \(\mathbf{x}_t\) 周围的小球里。
 
     **边缘项** \(\log q(\mathbf{x}_{t-1})\) 是复杂多峰的函数，但我们**只需要它在窗内的样子**。先钉死展开的对象：Taylor **只伺候这一项**——似然项本来就是高斯，取完 log 是**精确的**二次式，不需要任何近似。展开点取 \(\mathbf{x}_t\)，展开变量 \(\boldsymbol{\delta}=\mathbf{x}_{t-1}-\mathbf{x}_t\)；注意"\(\boldsymbol{\delta}\) 小"**不是假设，是似然窗强制的**——窗外 \(\|\boldsymbol{\delta}\|\gg\sqrt{\beta_t}\) 的候选早被压到零权重，展开只需在 \(\|\boldsymbol{\delta}\|\sim\sqrt{\beta_t}\) 内有效。记 \(\mathbf{s}=\nabla\log q(\mathbf{x}_t)\)（score）、\(\mathbf{H}\) 为 Hessian：
 
