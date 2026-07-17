@@ -514,7 +514,21 @@ L_{t-1} = \mathbb{E}_q\left[\frac{1}{2\sigma_t^2}\left\|\tilde{\boldsymbol{\mu}}
 
 ### 5.2 换元：为什么预测噪声
 
-现在做一步关键换元。由闭式解反解出 \(\mathbf{x}_0\)：
+!!! note "先 recall 几个符号（都在前文定义过，免得往回翻）"
+
+    这一节要动的量，来路都在前面：
+
+    | 符号 | 是什么 | 在哪定义 |
+    |---|---|---|
+    | \(\beta_t\) | 第 \(t\) 步加的噪声量（schedule） | 3.1 节 |
+    | \(\alpha_t=1-\beta_t\) | 单步的"信号保留率" | 3.2 节 |
+    | \(\bar\alpha_t=\alpha_1\cdots\alpha_t\) | 累积信号保留率，闭式解 \(\mathbf{x}_t=\sqrt{\bar\alpha_t}\mathbf{x}_0+\sqrt{1-\bar\alpha_t}\boldsymbol{\epsilon}\) 里那个 | 3.2 节 |
+    | \(\tilde{\boldsymbol{\mu}}_t(\mathbf{x}_t,\mathbf{x}_0)\) | **教师均值**：带 \(\mathbf{x}_0\) 的高斯后验 \(q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) 的均值，"已知带噪图和真图，上一步该在哪"。偷看了 \(\mathbf{x}_0\)，是理想目标 | 4 节 |
+    | \(\boldsymbol{\mu}_\theta(\mathbf{x}_t,t)\) | **学生均值**：网络反向 \(p_\theta(\mathbf{x}_{t-1}\mid\mathbf{x}_t)\) 的均值，看不到 \(\mathbf{x}_0\)，要去逼近 \(\tilde{\boldsymbol{\mu}}_t\) | 5.1 节 |
+
+    上一节的落点就是"教师均值 − 学生均值求平方距离" \(\|\tilde{\boldsymbol{\mu}}_t-\boldsymbol{\mu}_\theta\|^2\)；这一节把它改写成"比噪声"。
+
+现在做一步关键换元。教师均值 \(\tilde{\boldsymbol{\mu}}_t\)（回忆：它是 \(\mathbf{x}_0\) 与 \(\mathbf{x}_t\) 的加权平均，系数是 4 节那"一堆吓人的东西"）里含着 \(\mathbf{x}_0\)，但采样时**没有 \(\mathbf{x}_0\)**——那正是要生成的东西。所以先由闭式解反解出 \(\mathbf{x}_0\)，好把它从公式里换掉：
 
 \[
 \mathbf{x}_0 = \frac{1}{\sqrt{\bar\alpha_t}}\left(\mathbf{x}_t - \sqrt{1-\bar\alpha_t}\,\boldsymbol{\epsilon}\right)
