@@ -425,6 +425,27 @@ q(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0) = \mathcal{N}\!\left(\mathbf{x}
 \mathbb{E}\left[-\log p_\theta(\mathbf{x}_0)\right] \le \mathbb{E}_q\left[-\log\frac{p_\theta(\mathbf{x}_{0:T})}{q(\mathbf{x}_{1:T}\mid\mathbf{x}_0)}\right] =: L
 \]
 
+??? note "展开：为什么是「负对数似然」、又为什么「求期望」？——从最大似然到一个能 descend 的损失"
+
+    上式左边的 \(\mathbb{E}[-\log p_\theta(\mathbf{x}_0)]\) 不是凭空写的，它是"最大化似然"这句话经过**三步无痛改写**的结果——每步都不改变最优解，只把它换成更好优化的形式。
+
+    **▍第一步：取 log（乘积 → 求和）**
+
+    最大似然要最大化整个数据集的似然 \(\prod_i p_\theta(\mathbf{x}_i)\)。取 log——log 单调递增，\(\arg\max\) 丝毫不变，但连乘变连加：\(\log\prod_i p_\theta(\mathbf{x}_i)=\sum_i\log p_\theta(\mathbf{x}_i)\)。为什么非换不可：
+
+    - **数值**：几十万维图像的密度是极小的数，几万张连乘会直接下溢成 0（梯度也跟着变 0，训练瘫掉）；log 变加法就稳了。
+    - **优化**：SGD 要的是能拆成 minibatch 的可加目标——\(\sum_i\) 天然可加，且 \(\nabla\sum=\sum\nabla\)，一个 batch 就能估计整体梯度。
+
+    **▍第二步：取负（最大 → 最小）**
+
+    优化器的惯例是**最小化**（梯度下降往下走）。\(\max\sum\log p_\theta\iff\min\sum(-\log p_\theta)\)，纯符号翻转。而 \(-\log p_\theta(\mathbf{x})\) 有个名字叫**自信息 / "surprise"**：模型给某张真图打的概率越低，\(-\log\) 越大。所以最小化负对数似然 = **让训练数据在模型眼里最不意外**（信息论上，\(-\log p(\mathbf{x})\) 是用模型 \(p\) 编码 \(\mathbf{x}\) 所需的 nat 数，最小化即最短编码）。
+
+    **▍第三步：求期望（从"这批数据" → "数据分布"）**
+
+    \(\frac1N\sum_i\big(-\log p_\theta(\mathbf{x}_i)\big)\) 就是训练集上的**平均**负对数似然，即经验期望 \(\mathbb{E}_{\mathbf{x}\sim\text{data}}[-\log p_\theta(\mathbf{x})]\)。除以 \(N\) 不改 \(\arg\min\)，但让损失尺度与数据量、batch 大小无关。而 \(N\to\infty\) 时它收敛到真实期望 \(\mathbb{E}_{p_{\text{data}}}[-\log p_\theta]\)——这一步正是前面"最大似然 = 覆盖型"折叠块的入口：\(\min\mathbb{E}_{p_{\text{data}}}[-\log p_\theta]\iff\min\mathrm{KL}(p_{\text{data}}\,\|\,p_\theta)\)。
+
+    三步合起来，"最大化似然"就成了上式左边的 \(\mathbb{E}[-\log p_\theta(\mathbf{x}_0)]\)——一个**可 descend、可 minibatch、有信息论意义**的损失。剩下唯一的问题是它**算不动**（\(p_\theta(\mathbf{x}_0)\) 要积掉整条轨迹，见"最后一块拼图"），所以才用 Jensen 把它上界成 \(L\)——那是下一个折叠块的事。注意区分**两个期望**：这里的 \(\mathbb{E}\) 是对**数据**取的（平均 NLL），\(L\) 里那个 \(\mathbb{E}_q\) 是对**前向轨迹**取的（来自变分上界），两者不是一回事。
+
 经过整理（关键是把联合分布按马尔可夫链拆开，并把 \(q(\mathbf{x}_{t-1}|\mathbf{x}_t)\) 用带 \(\mathbf{x}_0\) 的后验替换），\(L\) 可以分解成逐项的 KL：
 
 \[
