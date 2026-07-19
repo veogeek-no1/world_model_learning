@@ -674,7 +674,81 @@ loss.backward()
 
 ### 6.2 DDIM：把随机链改成确定性映射
 
-DDIM 的洞察是：\(L_{\text{simple}}\) 只依赖边缘分布 \(q(\mathbf{x}_t|\mathbf{x}_0)\)，**并不要求前向过程必须是马尔可夫链**。于是可以构造一族非马尔可夫过程，它们的边缘分布完全相同（因此**训练好的模型可以直接复用，无需重训**），但采样时可以跳步：
+DDPM 的 1000 步是被马尔可夫链**逼**出来的：前向定义成逐步加噪，反向就得逐步还原，一步都不能少。DDIM 的做法是回头审视训练目标，发现这个约束其实从未被真正需要过。
+
+#### 6.2.1 训练目标里根本没有马尔可夫链
+
+把 \(L_{\text{simple}}\) 逐个符号看一遍：
+
+\[
+L_{\text{simple}} = \mathbb{E}_{t,\ \mathbf{x}_0\sim q(\mathbf{x}_0),\ \boldsymbol{\epsilon}\sim\mathcal{N}(\mathbf{0},\mathbf{I})}\left[\left\|\boldsymbol{\epsilon}-\boldsymbol{\epsilon}_\theta\!\left(\sqrt{\bar\alpha_t}\mathbf{x}_0+\sqrt{1-\bar\alpha_t}\boldsymbol{\epsilon},\ t\right)\right\|^2\right]
+\]
+
+期望里的随机量只有三个：\(t\)、\(\mathbf{x}_0\)、\(\boldsymbol{\epsilon}\)。后两者一组合就是 \(\mathbf{x}_t\)，也就是说 \(\mathbf{x}_t\) **只从边缘分布 \(q(\mathbf{x}_t\mid\mathbf{x}_0)=\mathcal{N}(\sqrt{\bar\alpha_t}\mathbf{x}_0,(1-\bar\alpha_t)\mathbf{I})\) 里采**。
+
+关键是：**联合分布 \(q(\mathbf{x}_{1:T}\mid\mathbf{x}_0)\) 自始至终没有出现**。训练从不需要成对的 \((\mathbf{x}_{t-1},\mathbf{x}_t)\)，每个 \(t\) 的损失独立计算，\(t=5\) 与 \(t=6\) 两项之间没有任何耦合。
+
+那马尔可夫性去哪了？它只活在**推导阶段**：3.2 节正是靠"逐步加噪 + 高斯叠加"才得到闭式解。**马尔可夫性是通往边缘分布的脚手架，不是训练目标的组成部分**。楼盖好了脚手架可以拆——换成任何别的前向过程，只要边缘 \(q(\mathbf{x}_t\mid\mathbf{x}_0)\) 不变，训练代码一个字都不用改，因为它压根看不见两者的区别。
+
+!!! warning "但「看不见」还不足以论证，需要 DDIM 的 Theorem 1"
+
+    有个坑容易滑过去：\(L_{\text{simple}}\) 不是 ELBO，它是 ELBO **扔掉了每个 \(t\) 的权重之后**的产物（5.2 节最后一刀）。而那些被扔掉的权重 \(\frac{\beta_t^2}{2\sigma_t^2\alpha_t(1-\bar\alpha_t)}\)，恰恰依赖前向过程的细节。
+
+    所以严格论证是：对下面构造的这族过程写出它**自己**的变分目标 \(J_\sigma\)，证明对族中每一个 \(\sigma\) 都有
+
+    \[
+    J_\sigma = L_{\text{simple}} + C,\qquad C\ \text{与}\ \theta\ \text{无关}
+    \]
+
+    即一个训练好的 \(\boldsymbol{\epsilon}_\theta\) 同时是整族过程的最优解——不是"凑合能用"，而是**本来就是同一个优化问题**。
+
+    值得玩味的是因果顺序：**正因为当初扔掉了权重，不同 \(\sigma\) 之间的差异才被抹平**。一个为了刷 FID 做的"理论上不严格"的简化，几个月后成了换采样器无需重训的许可证。
+
+#### 6.2.2 构造这族非马尔可夫过程
+
+思路整个反过来：
+
+| | 定义什么 | 推出什么 |
+|---|---|---|
+| **DDPM** | 前向 \(q(\mathbf{x}_t\mid\mathbf{x}_{t-1})\) | 边缘 \(q(\mathbf{x}_t\mid\mathbf{x}_0)\) |
+| **DDIM** | 把边缘钉死当**约束** | 反解出还有哪些过程满足它 |
+
+具体做法是跳过前向、直接写下**反向条件分布**，并且——这正是非马尔可夫的来源——**让它显式依赖 \(\mathbf{x}_0\)**：
+
+\[
+q_\sigma(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)=\mathcal{N}\!\left(\sqrt{\bar\alpha_{t-1}}\mathbf{x}_0+\sqrt{1-\bar\alpha_{t-1}-\sigma_t^2}\cdot\frac{\mathbf{x}_t-\sqrt{\bar\alpha_t}\mathbf{x}_0}{\sqrt{1-\bar\alpha_t}},\ \ \sigma_t^2\mathbf{I}\right)
+\]
+
+那几个系数不是凑的，是被边缘约束**逼**出来的。验证值得亲手算一遍：注意 \(\frac{\mathbf{x}_t-\sqrt{\bar\alpha_t}\mathbf{x}_0}{\sqrt{1-\bar\alpha_t}}\) 就是当初造 \(\mathbf{x}_t\) 用的那个 \(\boldsymbol{\epsilon}\)，代回去写成显式采样：
+
+\[
+\mathbf{x}_{t-1}=\sqrt{\bar\alpha_{t-1}}\mathbf{x}_0+\sqrt{1-\bar\alpha_{t-1}-\sigma_t^2}\,\boldsymbol{\epsilon}+\sigma_t\mathbf{z},\qquad \boldsymbol{\epsilon}\perp\mathbf{z}
+\]
+
+后两项都是零均值高斯且互相独立，方差直接相加：
+
+\[
+(1-\bar\alpha_{t-1}-\sigma_t^2)+\sigma_t^2=1-\bar\alpha_{t-1}\quad\checkmark
+\]
+
+于是 \(\mathbf{x}_{t-1}\sim\mathcal{N}(\sqrt{\bar\alpha_{t-1}}\mathbf{x}_0,(1-\bar\alpha_{t-1})\mathbf{I})\)，**正是要求的边缘，且对任意 \(\sigma_t\in[0,\sqrt{1-\bar\alpha_{t-1}}]\) 都成立**。那个 \(\sigma_t^2\) 被设计成"从确定性方向里扣掉多少、就从随机项里补回来多少"，总方差守恒。每步一个自由参数，所以这是一个 \(T\) 维的族：
+
+| \(\sigma_t\) 取值 | 得到什么 |
+|---|---|
+| \(\sqrt{\tilde\beta_t}\)（DDPM 后验方差） | 完全退化回 DDPM，过程重新变成马尔可夫的 |
+| \(0\) | DDIM，确定性 |
+| 中间值 | 一整条连续谱，随机性可调 |
+
+**为什么它不是马尔可夫的**：\(q_\sigma(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\) 里 \(\mathbf{x}_0\) 是真出现的。由它反推的前向 \(q_\sigma(\mathbf{x}_t\mid\mathbf{x}_{t-1},\mathbf{x}_0)\) 同样赖着 \(\mathbf{x}_0\) 不走，即给定 \(\mathbf{x}_{t-1}\) 后 \(\mathbf{x}_t\) 与 \(\mathbf{x}_0\) **并不**条件独立——整条链自始至终"记得"原图。这在 DDPM 的框架里是违规的，但在这里完全无害：
+
+- **训练**只需要边缘，一步造样本，用不着前向链；
+- **采样**只需要 \(q_\sigma(\mathbf{x}_{t-1}\mid\mathbf{x}_t,\mathbf{x}_0)\)，而 \(\mathbf{x}_0\) 未知就用网络当前的估计 \(\hat{\mathbf{x}}_0\) 顶上。
+
+前向链本身从未被真正使用过，所以它是不是马尔可夫的，根本无所谓。
+
+#### 6.2.3 采样公式与跳步
+
+把 \(\mathbf{x}_0\to\hat{\mathbf{x}}_0\) 代入上式，就是 DDIM 的采样步：
 
 \[
 \mathbf{x}_{t-1} = \sqrt{\bar\alpha_{t-1}}\underbrace{\left(\frac{\mathbf{x}_t-\sqrt{1-\bar\alpha_t}\,\boldsymbol{\epsilon}_\theta(\mathbf{x}_t,t)}{\sqrt{\bar\alpha_t}}\right)}_{\hat{\mathbf{x}}_0:\ \text{当前对原图的估计}} + \underbrace{\sqrt{1-\bar\alpha_{t-1}-\sigma_t^2}\cdot\boldsymbol{\epsilon}_\theta(\mathbf{x}_t,t)}_{\text{指向}\ \mathbf{x}_{t-1}\ \text{的方向}} + \sigma_t\mathbf{z}
@@ -682,10 +756,37 @@ DDIM 的洞察是：\(L_{\text{simple}}\) 只依赖边缘分布 \(q(\mathbf{x}_t
 
 结构非常好读：**先跳到对干净图像的估计 \(\hat{\mathbf{x}}_0\)，再按新的噪声水平退回去一点**。
 
-令 \(\sigma_t=0\) 则随机项消失，采样变成**完全确定性**的：给定 \(\mathbf{x}_T\) 就唯一确定 \(\mathbf{x}_0\)。这带来两个后果：
+**跳步从哪来**：既然约束只落在边缘上，而边缘 \(q(\mathbf{x}_\tau\mid\mathbf{x}_0)\) 对**任意** \(\tau\) 都是现成的闭式解，那就可以只在一个子序列 \(\tau_1<\tau_2<\cdots<\tau_S\)（比如从 1000 步里挑 50 个）上定义这族过程，上面的推导逐字成立。这才是 \(1000\to 50\) 的真正来源——**不是"用大步长近似求解 ODE"，而是这族过程压根没规定你必须经过每个中间时刻**。
 
-- **可跳步**。既然是确定性 ODE 式的轨迹，就能用大步长求解，\(1000\to 50\) 步质量几乎不掉。
-- **latent 有了语义**。\(\mathbf{x}_T\) 成为图像的确定性编码，在两个 \(\mathbf{x}_T\) 之间插值可以得到语义连续的过渡——DDPM 做不到这点。
+（确定性轨迹的 ODE 视角是后来 Score SDE 补上的，两个视角都成立，但 DDIM 原文的论证是上面这条。）
+
+#### 6.2.4 确定性带来的隐空间
+
+令 \(\sigma_t=0\)，随机项消失，采样成为**确定性且可逆**的映射：给定 \(\mathbf{x}_T\) 就唯一确定 \(\mathbf{x}_0\)。于是 \(\mathbf{x}_T\) 成了图像的一个编码，在两个 \(\mathbf{x}_T\) 之间插值能得到**视觉上连续的过渡**。
+
+DDPM 做不到这一点：它每步注入新噪声，\(\mathbf{x}_T\) 只贡献了总随机性的极小一部分，固定 \(\mathbf{x}_T\) 换随机种子会得到两张毫不相干的图。
+
+!!! warning "插值的三个坑"
+
+    **一、必须用 slerp，不能线性插值**（这个是硬伤，直接 lerp 出来的中间帧会明显发灰发糊，容易误判成模型问题）。
+
+    高维高斯的概率质量不在原点附近，而集中在半径 \(\sqrt{d}\) 的**薄球壳**上。两个独立样本 \(\mathbf{z}_1,\mathbf{z}_2\) 在高维下几乎必然接近正交，中点模长为
+
+    \[
+    \left\|\tfrac{\mathbf{z}_1+\mathbf{z}_2}{2}\right\|\approx\tfrac{1}{2}\sqrt{d+d}=\sqrt{d/2}\approx 0.707\sqrt{d}
+    \]
+
+    以 \(d=4\times64\times64=16384\) 为例：球壳半径 \(\approx 128\)，壳厚（\(\chi\) 分布标准差）\(\approx 0.7\)，而线性中点模长 \(\approx 90\)——**偏离 50 多个标准差**。这个点在训练分布里的出现概率是天文数字级的小，网络在此等于外推，表现就是低对比度、去饱和、细节糊。
+
+    正确做法是球面线性插值，沿球壳走、全程保持模长：
+
+    \[
+    \mathrm{slerp}(\mathbf{z}_1,\mathbf{z}_2;\lambda)=\frac{\sin((1-\lambda)\theta)}{\sin\theta}\mathbf{z}_1+\frac{\sin(\lambda\theta)}{\sin\theta}\mathbf{z}_2,\qquad \theta=\arccos\frac{\langle\mathbf{z}_1,\mathbf{z}_2\rangle}{\|\mathbf{z}_1\|\|\mathbf{z}_2\|}
+    \]
+
+    **二、"语义"要打折扣**。过渡是**平滑的**，但不等于**语义解耦的**。\(\mathbf{x}_T\) 空间里没有"戴眼镜轴""年龄轴"这类东西，不像 StyleGAN 的 \(\mathcal{W}\) 空间能找到属性方向向量。你得到的是一条平滑形变路径，中间帧是合理图像，但不保证是两端概念的有意义混合。对文生图模型还要分清两条独立的轴：插值 \(\mathbf{x}_T\)（prompt 固定）改的是构图/实例，插值 text embedding 改的才是语义。
+
+    **三、真实图片的反演只是近似**。上面说的一一对应，对**模型自己生成**的图是精确的（\(\mathbf{x}_T\) 本就是起点）。若要拿一张真实照片做插值，需先跑 DDIM inversion 反推其 \(\mathbf{x}_T\)，这步依赖每步的局部线性化假设、误差会累积；在高 guidance scale 下反演基本崩掉，重建与原图都不像。这催生了 Null-text Inversion、EDICT 等一整条后续工作。
 
 ## 7. 另一个视角：score matching
 
