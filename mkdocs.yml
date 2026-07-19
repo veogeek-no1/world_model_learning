@@ -83,4 +83,5 @@ nav:
       # navigation.indexes 让 README.md 成为该章节的落地页
       - dit/README.md
       - Diffusion 基础: dit/diffusion-basics.md
+      - 条件机制: dit/conditioning.md
   - 世界模型 · 北极星: world-model/README.md

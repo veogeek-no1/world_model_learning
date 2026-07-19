@@ -11,8 +11,11 @@
 - [ ] `flow-matching.md` —— Flow matching / rectified flow：与 diffusion 的关系、为何 SD3/Flux 采用
 - [ ] `latent-diffusion.md` —— Latent Diffusion：VAE 潜空间、为何不在像素空间做
 - [ ] `dit-arch.md` —— DiT 架构：patchify、adaLN-Zero 条件注入、scaling law（Peebles & Xie 2023）
-- [ ] `conditioning.md` —— 条件机制：cross-attention、classifier-free guidance、T5/CLIP 文本编码
-      > 直接承接基础篇：基础篇是无条件生成 \(p(\mathbf{x})\)，这一篇讲如何用文本控制成 \(p(\mathbf{x}\mid\mathbf{c})\)。
+- [x] [`conditioning.md`](conditioning.md) —— 条件机制：cross-attention、classifier-free guidance、T5/CLIP 文本编码
+      > 一句话结论：从 \(p(\mathbf{x})\) 到 \(p(\mathbf{x}\mid\mathbf{c})\) 数学一行不用改，难点全在"\(\mathbf{c}\) 从哪进去"。
+      > AdaGN 那条通路对文本失效的根因是**空间均匀性**（表达不了"哪个词管哪块区域"），
+      > 所以要 cross-attention 让每个位置各自查询每个词；而光有条件还不够听话——
+      > guidance 的本质是对着温度锐化的 \(p^s\) 采样，必然拿多样性换保真度。
 - [ ] `video-dit.md` —— 视频生成：时空 patch、spatial/temporal attention、时序一致性（Sora 类）
 - [ ] `models-survey.md` —— 代表模型对照：SD3 / PixArt / Flux / Sora / Seedance 的取舍
 
