@@ -9,7 +9,12 @@
       > 它让训练能随机取 \(t\) 一步构造样本；而 ELBO 一路化简后只剩一行 MSE，
       > 预测噪声而非原图使任务难度在 \(t\) 上均衡。多步的根本原因是：\(\beta_t\) 小，反向分布才近似高斯。
 - [ ] `flow-matching.md` —— Flow matching / rectified flow：与 diffusion 的关系、为何 SD3/Flux 采用
-- [ ] `latent-diffusion.md` —— Latent Diffusion：VAE 潜空间、为何不在像素空间做
+- [x] [`latent-diffusion.md`](latent-diffusion.md) —— Latent Diffusion：VAE 潜空间、为何不在像素空间做
+      > 一句话结论：像素空间的算力浪费在**人眼看不见的高频细节**上，于是拆成
+      > "自编码器做感知压缩 + 扩散模型做语义建模"。那个自编码器**不是标准 VAE**——
+      > 正则被压到 \(10^{-6}\)，因为它不需要 latent 贴近先验；
+      > 换句话说 LDM 是**用扩散模型替换掉了 VAE 那个不堪重任的高斯先验**。
+      > 代价是重建天花板：解码器还原不出的东西，生成模型再强也拿不回来。
 - [ ] `dit-arch.md` —— DiT 架构：patchify、adaLN-Zero 条件注入、scaling law（Peebles & Xie 2023）
 - [x] [`conditioning.md`](conditioning.md) —— 条件机制：cross-attention、classifier-free guidance、T5/CLIP 文本编码
       > 一句话结论：从 \(p(\mathbf{x})\) 到 \(p(\mathbf{x}\mid\mathbf{c})\) 数学一行不用改，难点全在"\(\mathbf{c}\) 从哪进去"。

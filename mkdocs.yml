@@ -84,4 +84,5 @@ nav:
       - dit/README.md
       - Diffusion 基础: dit/diffusion-basics.md
       - 条件机制: dit/conditioning.md
+      - Latent Diffusion: dit/latent-diffusion.md
   - 世界模型 · 北极星: world-model/README.md
