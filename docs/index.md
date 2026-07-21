@@ -18,6 +18,8 @@
 
 如果只读一篇，读 **[演进脉络](roadmap.md)** —— 它用一条主线串起 DDPM → DDIM → LDM → DiT → Flow Matching → 视频 DiT → 世界模型，每一步都框定为"在解决上一步的哪个瓶颈"。深入任何单个节点之前，建议先在这张图上定位它。
 
+两条主线共用的地基先补齐：**[基础 · Transformer](foundations/transformer.md)** —— attention 的软查表直觉、QKV 的分工、self 与 cross 的唯一区别、多头与 FFN、位置编码。ViT、LLM、DiT、条件注入都是这套零件的重新接线。
+
 三条主线各自的主题清单与奠基论文：
 
 - **[VLM · 视觉理解](vlm/README.md)** —— 视觉编码器、模态对齐、LLaVA 系、评测与幻觉

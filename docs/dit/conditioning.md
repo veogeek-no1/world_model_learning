@@ -90,6 +90,8 @@ AdaGN 的信息瓶颈极窄：无论条件多复杂，最终只落成**每通道
 1. **最后一个 token 的 embedding**，放进 ADM 里原本给 class embedding 的那个位置——也就是走 2.1 节的 AdaGN 通路；
 2. **整个 token 序列**，投影到各 attention 层的维度后，**拼接到该层已有的 attention context 上**。
 
+    这里的 "attention context" 指该层里参与相互注意的那一组 token——self-attention 中它本来只有图像自己的空间位置，GLIDE 把文本 token 也塞了进去，于是图像位置在做注意力时能直接"看见"具体的词。若对 attention / Transformer 不熟，先读 [基础 · Transformer](../foundations/transformer.md)，本节与下一节所需的零件都在那篇里。
+
 第二路是关键的新东西：它保留了序列结构，让空间位置能通过 attention 与具体的词发生关系。但注意实现细节——GLIDE 是把文本 token **拼进已有的 self-attention 上下文**，让图像 token 和文本 token 挤在同一个注意力里，而**不是**一个独立的 cross-attention 块。后者要到 LDM 才定型。
 
 所以 GLIDE 最准确的描述是：**ADM 把类别标签换成文本，再补上序列级的 attention 条件**。它继承了 ADM 的全套条件管线，第 1 路走的就是 2.1 节那个 AdaGN 插槽。
