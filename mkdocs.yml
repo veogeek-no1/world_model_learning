@@ -79,7 +79,9 @@ nav:
   - 首页: index.md
   - 演进脉络: roadmap.md
   - 基础 · Transformer: foundations/transformer.md
-  - VLM · 视觉理解: vlm/README.md
+  - VLM · 视觉理解:
+      - vlm/README.md
+      - ViT 与视觉编码器: vlm/vit-basics.md
   - DiT · 生成与模拟:
       # navigation.indexes 让 README.md 成为该章节的落地页
       - dit/README.md

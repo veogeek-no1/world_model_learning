@@ -4,7 +4,8 @@
 
 ## 主题清单
 
-- [ ] `vit-basics.md` —— 视觉编码器：ViT、CLIP、SigLIP，如何把图像变成 token
+- [x] [`vit-basics.md`](vit-basics.md) —— 视觉编码器：ViT、CLIP、SigLIP，如何把图像变成 token
+  <br>结论：ViT 只在"切 patch → 线性投影 → token"这一步创新，之后照搬标准 encoder；patch 的语义不是切出来就有的，是训练信号塑造的。监督分类把语义锁在固定类别里，CLIP/SigLIP 的图文对比学习才把图像和文本压进同一个可做 attention 的空间。
 - [ ] `alignment.md` —— 模态对齐：如何把视觉特征接到 LLM（projector/Q-Former/cross-attn）
 - [ ] `llava-line.md` —— LLaVA 系：极简 projector + 指令微调的范式
 - [ ] `qwen-internvl.md` —— Qwen-VL / InternVL：动态分辨率、原生多模态的演进
